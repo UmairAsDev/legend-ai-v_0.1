@@ -31,3 +31,10 @@ htmlcov/
 .pytest_cache/
 
 uv.lock
+
+
+# Testing files
+tests/__pycache__/
+tests/*.py[oc]
+tests/data/
+test/
