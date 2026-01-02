@@ -8,6 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+.venv-py310
+env/
+venv/
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/ 
@@ -38,3 +41,15 @@ tests/__pycache__/
 tests/*.py[oc]
 tests/data/
 test/
+
+
+*.zip
+*.tar.gz
+
+aws/
+
+notebook/.ipynb_checkpoints/
+
+# yaml files
+config/tool.yaml
+*.yaml
