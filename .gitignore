@@ -51,5 +51,5 @@ aws/
 notebook/.ipynb_checkpoints/
 
 # yaml files
-config/tool.yaml
+config/
 *.yaml

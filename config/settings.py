@@ -19,6 +19,7 @@ config_yaml = load_yaml_config('config/tool.yaml')
 class Settings(BaseSettings):
     model_arn: str = config_yaml['bedrock']['model_arn']
     provider: str = config_yaml['bedrock']['provider']
+    model_id: str = config_yaml['bedrock']['model_id']
     region: str = config_yaml['bedrock']['region']
     runtime: str = config_yaml['bedrock']['runtime']
     endpoint_url: str = config_yaml['bedrock'].get('endpoint_url', '')
@@ -28,6 +29,10 @@ class Settings(BaseSettings):
     aws_access_key_id: str = config_yaml['bedrock'].get('aws_access_key_id', '')
     aws_secret_access_key: str = config_yaml['bedrock'].get('aws_secret_access_key', '')
     aws_session_token: str = config_yaml['bedrock'].get('aws_session_token', '')
+    deepgram_api_key: str = config_yaml['deepgram'].get('deepgram_api_key', '')
+    daily_api_key: str = config_yaml['daily'].get('daily_api_key', '')
+    daily_room_name: str = config_yaml['daily'].get('daily_room_name', '')
+    daily_url: str = config_yaml['daily'].get('daily_room_url', '')
     
     model_config = ConfigDict(
         env_prefix='BEDROCK_',
