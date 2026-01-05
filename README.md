@@ -1,16 +1,21 @@
-# Legend Voice Agent
+# Legend Voice Agent - Updated for Pipecat Native Monitoring
 
-Production-ready voice-to-clinical-note API with comprehensive monitoring, error handling, and security features.
+Production-ready voice-to-clinical-note API with **Pipecat's native OpenTelemetry tracing** for comprehensive monitoring.
+
+## Key Changes
+
+✅ **Removed custom authentication** - Your integrating system handles this  
+✅ **Using Pipecat's native metrics** - OpenTelemetry tracing for token usage, latency, and performance  
+✅ **Simplified architecture** - No redundant metrics collection  
+✅ **Optional rate limiting** - Set `RATE_LIMIT_PER_MINUTE=0` to disable  
 
 ## Features
 
 - 🎤 **Voice Transcription**: Real-time speech-to-text using Deepgram
 - 🤖 **AI-Powered**: Clinical note generation using AWS Bedrock (Claude)
-- 📊 **Comprehensive Monitoring**: Token usage tracking, cost estimation, and performance metrics
-- 🔒 **Security**: API key authentication, rate limiting, input validation
+- 📊 **Pipecat Native Monitoring**: OpenTelemetry tracing with automatic token usage tracking
 - 🛡️ **Resilience**: Circuit breakers, retry logic with exponential backoff
 - 📝 **Structured Logging**: Correlation IDs for request tracing, PII sanitization
-- 🏥 **HIPAA-Ready**: Audit logging, data encryption support
 
 ## Quick Start
 
@@ -20,63 +25,77 @@ Production-ready voice-to-clinical-note API with comprehensive monitoring, error
 - Docker (optional, for containerized deployment)
 - Deepgram API key
 - AWS credentials with Bedrock access
+- OpenTelemetry Collector (optional, for metrics)
 
 ### Local Development
 
-1. **Clone the repository**
-   ```bash
-   cd /home/umair/projects/legend-voice-agent
-   ```
-
-2. **Create virtual environment**
-   ```bash
-   python -m venv env
-   source env/bin/activate  # On Windows: env\Scripts\activate
-   ```
-
-3. **Install dependencies**
+1. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Configure environment variables**
+2. **Configure environment variables**
    ```bash
    cp .env.example .env
    # Edit .env with your actual values
    ```
 
-5. **Run the application**
+3. **Run the application**
    ```bash
-   python main.py
+   python3 main.py
    ```
 
-6. **Access the API**
-   - API: http://localhost:8000
-   - Swagger Docs: http://localhost:8000/docs
-   - Health Check: http://localhost:8000/health
-   - Metrics: http://localhost:8000/metrics
+4. **Access the API**
+   - API: http://localhost:8001
+   - Swagger Docs: http://localhost:8001/docs
+   - Health Check: http://localhost:8001/health
 
-### Docker Deployment
+## OpenTelemetry Tracing Setup
 
-1. **Build and run with Docker Compose**
-   ```bash
-   docker-compose up --build
-   ```
+Pipecat automatically tracks:
+- **Token Usage**: Deepgram (STT) and AWS Bedrock (LLM) token consumption
+- **Latency**: Request processing times
+- **Turns**: Conversation turn tracking
+- **Errors**: Automatic error capture
 
-2. **Run in detached mode**
-   ```bash
-   docker-compose up -d
-   ```
+### Enable Tracing
 
-3. **View logs**
-   ```bash
-   docker-compose logs -f
-   ```
+```bash
+# In .env file
+OTEL_TRACING_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317  # Your collector endpoint
+OTEL_CONSOLE_EXPORT=false  # Set true for debug output
+```
 
-4. **Stop services**
-   ```bash
-   docker-compose down
-   ```
+### Jaeger Example
+
+```bash
+# Run Jaeger all-in-one
+docker run -d --name jaeger \
+  -p 4317:4317 \
+  -p 16686:16686 \
+  jaegertracing/all-in-one:latest
+
+# Access Jaeger UI at http://localhost:16686
+```
+
+## Environment Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `DEEPGRAM_API_KEY` | Deepgram API key for STT | - | Yes |
+| `AWS_REGION` | AWS region for Bedrock | us-east-1 | Yes |
+| `MODEL_ID` | AWS Bedrock model ID | - | Yes |
+| `AWS_ACCESS_KEY_ID` | AWS access key | - | Yes |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key | - | Yes |
+| `OTEL_TRACING_ENABLED` | Enable OpenTelemetry tracing | false | No |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint | http://localhost:4317 | No |
+| `OTEL_CONSOLE_EXPORT` | Export traces to console | false | No |
+| `RATE_LIMIT_PER_MINUTE` | Rate limit per client (0=disabled) | 0 | No |
+| `LOG_LEVEL` | Logging level | INFO | No |
+| `ENVIRONMENT` | Environment (development/production) | development | No |
+| `HOST` | Server host | 127.0.0.1 | No |
+| `PORT` | Server port | 8001 | No |
 
 ## API Endpoints
 
@@ -85,25 +104,16 @@ Production-ready voice-to-clinical-note API with comprehensive monitoring, error
 GET /health
 ```
 
-Returns service health status and external service connectivity.
-
-### Metrics
+### Metrics Info
 ```bash
 GET /metrics
 ```
-
-Returns comprehensive metrics including:
-- Total requests and error rates
-- Token usage (STT and LLM)
-- Cost estimates
-- Average latency
-- Active sessions
+Returns information about OpenTelemetry tracing. Actual metrics are in your OTLP backend.
 
 ### Generate Clinical Note
 ```bash
 POST /api/v1/bot
 Content-Type: application/json
-X-API-Key: your-api-key
 
 {
   "patient_data": {
@@ -119,147 +129,73 @@ X-API-Key: your-api-key
 }
 ```
 
-## Environment Variables
+## Monitoring with OpenTelemetry
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `API_KEYS` | Comma-separated list of valid API keys | - | No* |
-| `DEEPGRAM_API_KEY` | Deepgram API key for STT | - | Yes |
-| `AWS_REGION` | AWS region for Bedrock | us-east-1 | Yes |
-| `MODEL_ID` | AWS Bedrock model ID | - | Yes |
-| `AWS_ACCESS_KEY_ID` | AWS access key | - | Yes |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key | - | Yes |
-| `RATE_LIMIT_PER_MINUTE` | Rate limit per client | 60 | No |
-| `LOG_LEVEL` | Logging level (DEBUG/INFO/WARNING/ERROR) | INFO | No |
-| `ENVIRONMENT` | Environment (development/production) | development | No |
-| `HOST` | Server host | 127.0.0.1 | No |
-| `PORT` | Server port | 8000 | No |
-| `ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) | * | No |
+Pipecat automatically exports:
 
-\* API key authentication is optional but recommended for production
+- **Spans**: Request traces with timing
+- **Metrics**: Token counts, latencies, error rates
+- **Attributes**: Session IDs, conversation IDs, service metadata
 
-## Monitoring & Metrics
-
-The API tracks comprehensive metrics accessible via `/metrics`:
-
-- **Token Usage**: Real-time tracking of Deepgram and Bedrock token consumption
-- **Cost Estimation**: Automatic cost calculation based on current pricing
-- **Performance**: Request latency, throughput, error rates
-- **Sessions**: Active and total session counts
-
-### Example Metrics Response
-```json
-{
-  "total_requests": 150,
-  "total_tokens_stt": 45000,
-  "total_tokens_llm_input": 12000,
-  "total_tokens_llm_output": 8000,
-  "average_latency_ms": 2500.5,
-  "error_rate": 1.2,
-  "uptime_seconds": 86400,
-  "estimated_costs": {
-    "deepgram_usd": 9.375,
-    "bedrock_input_usd": 0.036,
-    "bedrock_output_usd": 0.12,
-    "total_usd": 9.531
-  }
-}
-```
-
-## Error Handling
-
-The API implements comprehensive error handling:
-
-- **Retry Logic**: Automatic retries with exponential backoff for transient failures
-- **Circuit Breakers**: Prevents cascading failures from external services
-- **Validation**: Input validation with detailed error messages
-- **Logging**: All errors logged with correlation IDs for tracing
-
-## Security Features
-
-- **API Key Authentication**: Header-based authentication (`X-API-Key`)
-- **Rate Limiting**: Per-client rate limiting (default: 60 requests/minute)
-- **Input Sanitization**: Automatic sanitization of user inputs
-- **PII Protection**: Sensitive data redacted in logs
-- **CORS**: Configurable CORS policies
+Query your OpenTelemetry backend (Jaeger, Prometheus, etc.) for:
+- Token usage trends
+- Cost analysis
+- Performance bottlenecks
+- Error tracking
 
 ## Project Structure
 
 ```
 legend-voice-agent/
-├── controller/          # API routes and request handlers
-│   ├── route/          # API endpoints
-│   └── schemas/        # Pydantic models for validation
-├── middleware/         # Custom middleware
-│   ├── auth.py        # API key authentication
-│   ├── rate_limiter.py # Rate limiting
-│   ├── error_handler.py # Global error handling
-│   └── logging_middleware.py # Request logging
-├── monitoring/         # Monitoring and observability
-│   ├── metrics_collector.py # Metrics tracking
-│   └── logger.py      # Structured logging
-├── utils/             # Utility functions
-│   ├── retry_handler.py # Retry logic and circuit breakers
-│   └── validators.py  # Input validation
-├── workflow/          # Core business logic
-│   ├── pipecat_flow.py # Main voice processing workflow
-│   ├── prompt.py      # LLM prompts
-│   └── bot.py         # Alternative bot implementation
+├── controller/          # API routes
+├── middleware/         # Logging, rate limiting, error handling
+├── monitoring/         # Structured logging
+├── utils/             # Validators, retry logic, circuit breakers
+├── workflow/          # Pipecat voice processing with OpenTelemetry
 ├── config/            # Configuration
-├── logs/              # Application logs
 ├── main.py            # Application entry point
-├── Dockerfile         # Docker configuration
-├── docker-compose.yml # Docker Compose setup
-├── requirements.txt   # Python dependencies
-└── .env.example       # Environment variables template
+└── requirements.txt   # Dependencies (includes OpenTelemetry)
 ```
+
+## What Changed
+
+### Removed
+- ❌ Custom metrics collector
+- ❌ API key authentication (handled by your system)
+- ❌ Manual token tracking
+
+### Added
+- ✅ Pipecat native OpenTelemetry tracing
+- ✅ Automatic token usage tracking
+- ✅ Conversation and turn tracking
+- ✅ Configurable OTLP export
+
+### Kept
+- ✅ Error handling & circuit breakers
+- ✅ Retry logic with exponential backoff
+- ✅ Input validation
+- ✅ Structured logging with correlation IDs
+- ✅ Optional rate limiting
 
 ## Development
 
 ### Running Tests
 ```bash
-pytest tests/ -v --cov=.
-```
-
-### Code Quality
-```bash
-# Format code
-black .
-
-# Lint
-flake8 .
-
-# Type checking
-mypy .
+pytest tests/ -v
 ```
 
 ## Troubleshooting
 
-### Common Issues
+**OpenTelemetry not working?**
+- Verify `OTEL_TRACING_ENABLED=true` in .env
+- Check collector is running on configured endpoint
+- Enable console export for debugging: `OTEL_CONSOLE_EXPORT=true`
 
-**1. Import Errors**
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-- Check Python version: `python --version` (should be 3.10+)
-
-**2. AWS Bedrock Access Denied**
-- Verify AWS credentials are correct
-- Ensure IAM role has Bedrock permissions
-- Check if model is available in your region
-
-**3. Deepgram API Errors**
-- Verify API key is valid
-- Check Deepgram account balance
-- Review rate limits
-
-**4. High Latency**
-- Check network connectivity to AWS/Deepgram
+**High latency?**
+- Check OpenTelemetry traces for bottlenecks
 - Review circuit breaker status in logs
-- Monitor token usage and costs
+- Monitor AWS/Deepgram service health
 
 ## License
 
 [Your License Here]
-
-## Support
-
-For issues and questions, please open an issue on GitHub or contact [your-email@example.com]

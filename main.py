@@ -18,7 +18,7 @@ logger = get_logger()
 # Create FastAPI app
 app = FastAPI(
     title="Legend Voice Agent API",
-    description="Production-ready voice-to-clinical-note API with comprehensive monitoring",
+    description="Production-ready voice-to-clinical-note API with Pipecat OpenTelemetry tracing",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -44,16 +44,14 @@ app.middleware("http")(ErrorHandlerMiddleware())
 # 2. Logging
 app.middleware("http")(LoggingMiddleware())
 
-# 3. Rate limiting
-rate_limit_per_minute = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
-rate_limiter = RateLimiter(requests_per_minute=rate_limit_per_minute)
-app.middleware("http")(RateLimitMiddleware(rate_limiter))
-
-# Note: Authentication middleware is optional - uncomment if needed
-# from middleware.auth import AuthMiddleware
-# api_keys = os.getenv("API_KEYS", "").split(",")
-# if api_keys and api_keys[0]:  # Only add if API keys are configured
-#     app.middleware("http")(AuthMiddleware(api_keys))
+# 3. Rate limiting (optional - can be disabled if not needed)
+rate_limit_per_minute = int(os.getenv("RATE_LIMIT_PER_MINUTE", "0"))
+if rate_limit_per_minute > 0:
+    rate_limiter = RateLimiter(requests_per_minute=rate_limit_per_minute)
+    app.middleware("http")(RateLimitMiddleware(rate_limiter))
+    logger.info(f"Rate limiting enabled: {rate_limit_per_minute} requests/minute")
+else:
+    logger.info("Rate limiting disabled")
 
 # Add global exception handler
 app.add_exception_handler(Exception, global_exception_handler)
@@ -65,7 +63,7 @@ def main():
     import uvicorn
 
     host = os.getenv("HOST", "127.0.0.1")
-    port = int(os.getenv("PORT", "8000"))
+    port = int(os.getenv("PORT", "8001"))
     reload = os.getenv("ENVIRONMENT", "development") == "development"
 
     logger.info(f"Starting server on {host}:{port}")

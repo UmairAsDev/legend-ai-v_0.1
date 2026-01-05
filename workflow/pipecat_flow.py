@@ -1,4 +1,5 @@
 import sys
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 from loguru import logger
@@ -10,7 +11,7 @@ load_dotenv(override=True)
 
 sys.path.append(str(Path(__file__).parent.parent))
 from config.settings import settings
-from monitoring.metrics_collector import metrics_collector
+
 from monitoring.logger import get_logger, configure_logging
 from utils.validators import (
     validate_transcript,
@@ -22,6 +23,34 @@ from utils.retry_handler import retry_with_backoff
 # Configure structured logging
 configure_logging(log_level="INFO", log_file="logs/pipecat_flow.log")
 logger = get_logger()
+
+# Setup OpenTelemetry tracing for Pipecat
+try:
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from pipecat.utils.tracing.setup import setup_tracing
+
+    # Get tracing configuration from environment
+    otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    otel_enabled = os.getenv("OTEL_TRACING_ENABLED", "false").lower() == "true"
+
+    if otel_enabled:
+        exporter = OTLPSpanExporter(
+            endpoint=otel_endpoint,
+            insecure=True,
+        )
+
+        setup_tracing(
+            service_name="legend-voice-agent",
+            exporter=exporter,
+            console_export=os.getenv("OTEL_CONSOLE_EXPORT", "false").lower() == "true",
+        )
+        logger.info(f"OpenTelemetry tracing enabled with endpoint: {otel_endpoint}")
+    else:
+        logger.info("OpenTelemetry tracing disabled")
+except ImportError:
+    logger.warning("OpenTelemetry packages not installed. Tracing disabled.")
+except Exception as e:
+    logger.error(f"Failed to setup OpenTelemetry tracing: {str(e)}")
 
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -62,7 +91,6 @@ Use concise, professional medical language.
 class TranscriptBuffer:
     def __init__(self):
         self.parts = []
-        self.audio_duration = 0.0  # Track audio duration for metrics
         self.start_time = time.time()
 
     def add(self, text: str):
@@ -78,7 +106,6 @@ class TranscriptBuffer:
 
     def clear(self):
         self.parts.clear()
-        self.audio_duration = 0.0
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -98,12 +125,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         transcript_buffer.add(transcript)
         logger.debug(f"Received transcript: {len(transcript)} characters")
 
-        # Track audio duration if available in kwargs
-        if "duration" in kwargs:
-            duration = kwargs["duration"]
-            transcript_buffer.audio_duration += duration
-            metrics_collector.record_stt_usage(duration)
-
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
     # PIPELINE: Audio → STT only
@@ -115,6 +136,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ]
     )
 
+    # Generate conversation ID for tracking
+    import uuid
+
+    conversation_id = str(uuid.uuid4())
+
     task = PipelineTask(
         pipeline=pipeline,
         params=PipelineParams(
@@ -122,6 +148,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_usage_metrics=True,
         ),
         observers=[RTVIObserver(rtvi)],
+        enable_tracing=True,  # Enable OpenTelemetry tracing
+        enable_turn_tracking=True,  # Enable turn tracking
+        conversation_id=conversation_id,  # Track this conversation
+        additional_span_attributes={
+            "service.name": "legend-voice-agent",
+            "service.version": "1.0.0",
+        },
     )
 
     @retry_with_backoff(max_retries=3, exceptions=(Exception,))
@@ -160,21 +193,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         )
 
         try:
-            # Call LLM and track token usage
+            # Call LLM (Pipecat automatically tracks token usage via enable_usage_metrics)
             llm_start = time.time()
             result = await llm(context)  # type: ignore
             llm_latency = (time.time() - llm_start) * 1000
 
             logger.info(f"LLM response received in {llm_latency:.2f}ms")
-
-            # Extract token usage from result if available
-            if hasattr(result, "usage"):
-                input_tokens = getattr(result.usage, "input_tokens", 0)
-                output_tokens = getattr(result.usage, "output_tokens", 0)
-                metrics_collector.record_llm_usage(input_tokens, output_tokens)
-                logger.info(
-                    f"Token usage - Input: {input_tokens}, Output: {output_tokens}"
-                )
 
             # Validate response
             if hasattr(result, "content"):
