@@ -21,7 +21,7 @@ from pipecat.pipeline.runner import PipelineRunner
 
 
 from config.settings import settings
-from prompt import prompt_with_context
+from workflow.prompt import prompt_with_context
 
 load_dotenv(override=True)
 logger.add("logs/bot.log", rotation="100 MB", enqueue=True)
