@@ -1,7 +1,8 @@
 import sys
 from pathlib import Path
 from pydantic_settings import BaseSettings
-from pydantic import ConfigDict
+from pydantic import ConfigDict, BaseModel
+from typing_extensions import List, Dict
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -42,4 +43,9 @@ class Settings(BaseSettings):
     )#type: ignore
     
 settings = Settings()
-    
+
+
+
+
+class PatientModel(BaseModel):
+    patient_data : List[Dict]
