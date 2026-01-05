@@ -16,3 +16,5 @@ aiortc
 pipecat.ai[deepgram]
 pipecat.ai[runner]
 opencv-python
+python-jose[cryptography]
+requests
